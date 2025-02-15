@@ -106,7 +106,7 @@ jobs:
       - name: Ensure broker is live
         run: |
           i=0
-          until curl -sSf --user admin:password pactst-pactb-l4tjtgszy4yg-1300157738.us-east-1.elb.amazonaws.com/diagnostic/status/heartbeat; do
+          until curl -sSf --user admin:password http://pactst-pactb-l4tjtgszy4yg-1300157738.us-east-1.elb.amazonaws.com/diagnostic/status/heartbeat; do
             i=$((i+1))
             if [ $i -gt 120 ]; then
               echo "Broker failed to start"
@@ -116,7 +116,7 @@ jobs:
           done
 
       - name: Run tests
-        run: hatch run test --broker-url=http://PactSt-PactB-l4tJtGszY4Yg-1300157738.us-east-1.elb.amazonaws.com
+        run: hatch run test --broker-url=http://admin:password@pactst-pactb-l4tjtgszy4yg-1300157738.us-east-1.elb.amazonaws.com
 
       - name: Upload coverage
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && matrix.os == 'ubuntu-latest'
