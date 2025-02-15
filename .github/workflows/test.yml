@@ -79,7 +79,10 @@ jobs:
           fi
 
       - name: Run tests
-        run: hatch run test --broker-url=${{ env.PACT_BROKER_URL }} --broker-username=${{ env.PACT_BROKER_USERNAME }} --broker-password=${{ env.PACT_BROKER_PASSWORD }} --container
+        env:
+          PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
+          PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
+        run: hatch run test --broker-url=${{ env.PACT_BROKER_URL }} --container
 
       - name: Upload coverage
         if: matrix.python-version == env.STABLE_PYTHON_VERSION
@@ -87,12 +90,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: tests
-          
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   example:
     name: Example
@@ -111,7 +108,10 @@ jobs:
         run: uv tool install hatch
 
       - name: Run examples
-        run: hatch run example --broker-url=${{ env.PACT_BROKER_URL }} --broker-username=${{ env.PACT_BROKER_USERNAME }} --broker-password=${{ env.PACT_BROKER_PASSWORD }}
+        env:
+          PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
+          PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
+        run: hatch run example --broker-url=${{ env.PACT_BROKER_URL }}
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5
