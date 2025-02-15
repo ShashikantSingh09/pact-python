@@ -72,7 +72,7 @@ jobs:
 
       - name: Check for Missing Feature File
         run: |
-          FEATURE_PATH="tests/v3/compatibility_suite/definition/features/V1/http_consumer.feature"
+          FEATURE_PATH="tests/v3/compatibility_suite/features/V1/http_consumer.feature"
           if [ ! -f "$FEATURE_PATH" ]; then
             echo "Error: Feature file '$FEATURE_PATH' is missing!"
             exit 1
