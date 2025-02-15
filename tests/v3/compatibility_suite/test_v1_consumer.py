@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 @scenario(
-    "definition/features/V1/http_consumer.feature",
+    "features/V1/http_consumer.feature",
     "When all requests are made to the mock server",
 )
 def test_when_all_requests_are_made_to_the_mock_server() -> None:
