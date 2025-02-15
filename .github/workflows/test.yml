@@ -106,7 +106,7 @@ jobs:
       - name: Ensure broker is live
         run: |
           i=0
-          until curl -sSf http://localhost:9292/diagnostic/status/heartbeat; do
+          until curl -sSf http://pactst-pactb-l4tjtgszy4yg-1300157738.us-east-1.elb.amazonaws.com/diagnostic/status/heartbeat; do
             i=$((i+1))
             if [ $i -gt 120 ]; then
               echo "Broker failed to start"
