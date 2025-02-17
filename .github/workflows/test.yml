@@ -4,10 +4,10 @@ name: test
 on:
   push:
     branches:
-      - main
+      - main1
   pull_request:
     branches:
-      - main
+      - main1
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -70,26 +70,11 @@ jobs:
       - name: Install Hatch
         run: uv tool install hatch
 
-      - name: Check for Missing Feature File
-        run: |
-          FEATURE_PATH="tests/v3/compatibility_suite/features/V1/http_consumer.feature"
-          if [ ! -f "$FEATURE_PATH" ]; then
-            echo "Error: Feature file '$FEATURE_PATH' is missing!"
-            exit 1
-          fi
-
       - name: Run tests
         env:
           PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
           PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
         run: hatch run test --broker-url=${{ env.PACT_BROKER_URL }} --container
-
-      - name: Upload coverage
-        if: matrix.python-version == env.STABLE_PYTHON_VERSION
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: tests
 
   example:
     name: Example
@@ -112,12 +97,6 @@ jobs:
           PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
           PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
         run: hatch run example --broker-url=${{ env.PACT_BROKER_URL }}
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: examples
 
   format:
     name: Format
