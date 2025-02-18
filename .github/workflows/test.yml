@@ -1,5 +1,5 @@
 ---
-name: test 
+name: test
 
 on:
   push:
@@ -18,9 +18,8 @@ env:
   PYTEST_ADDOPTS: --color=yes
   HATCH_VERBOSE: '1'
   FORCE_COLOR: '1'
-  PACT_BROKER_URL: 'http://pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com'
-  PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
-  PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
+  PACT_BROKER_USERNAME: ${{secrets.PACT_BROKER_USERNAME}}
+  PACT_BROKER_PASSWORD: ${{secrets.PACT_BROKER_PASSWORD}}
 
 jobs:
   complete:
@@ -33,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test-linux
+      - test-other
       - example
       - format
       - lint
@@ -43,26 +43,119 @@ jobs:
     steps:
       - name: Failed
         run: exit 1
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result,
+          'skipped')
 
   test-linux:
-    name: Test Python ${{ matrix.python-version }} on Linux
-    runs-on: ubuntu-latest
+    name: >-
+      Test Python ${{ matrix.python-version }}
+      on ${{ startsWith(matrix.os, 'macos-') && 'macOS' || startsWith(matrix.os, 'windows-') && 'Windows' || 'Linux' }}
+
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - ubuntu-latest
         python-version:
           - '3.9'
           - '3.10'
           - '3.11'
           - '3.12'
           - '3.13'
-    
+        experimental:
+          - false
+        include:
+            # Run tests against the next Python version, but no need for the full list of OSes.
+          - os: ubuntu-latest
+            python-version: '3.14'
+            experimental: true
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          submodules: true
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+
+      - name: Install Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install Hatch
+        run: uv tool install hatch
+
+      - name: Ensure broker is live
+        run: |
+          i=0
+          until curl -sSf curl -sSf http://admin:password@pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com/diagnostic/status/heartbeat; do
+            i=$((i+1))
+            if [ $i -gt 120 ]; then
+              echo "Broker failed to start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run tests
+        env:
+          PACT_BROKER_USERNAME: ${{secrets.PACT_BROKER_USERNAME}}
+          PACT_BROKER_PASSWORD: ${{secrets.PACT_BROKER_PASSWORD}}
+        run: hatch run test --broker-url=http://pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com --container
+
+      - name: Upload coverage
+        if: matrix.python-version == env.STABLE_PYTHON_VERSION && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3  # v5.3.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: tests
+
+  test-other:
+    name: >-
+      Test Python ${{ matrix.python-version }}
+      on ${{ startsWith(matrix.os, 'macos-') && 'macOS' || startsWith(matrix.os, 'windows-') && 'Windows' || 'Linux' }}
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+        python-version:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+        # Python 3.9 aren't supported on macos-latest (ARM)
+        exclude:
+          - os: macos-latest
+            python-version: '3.9'
+        include:
+          - os: macos-13
+            python-version: '3.9'
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          submodules: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install Python
         run: uv python install ${{ matrix.python-version }}
@@ -71,20 +164,23 @@ jobs:
         run: uv tool install hatch
 
       - name: Run tests
-        env:
-          PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
-          PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
-        run: hatch run test --broker-url=${{ env.PACT_BROKER_URL }} --container
+        run: hatch run test
 
   example:
     name: Example
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install Python
         run: uv python install ${{ env.STABLE_PYTHON_VERSION }}
@@ -92,21 +188,46 @@ jobs:
       - name: Install Hatch
         run: uv tool install hatch
 
-      - name: Run examples
+      - name: Ensure broker is live
+        run: |
+          i=0
+          until curl -sSf http://admin:password@pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com/diagnostic/status/heartbeat; do
+            i=$((i+1))
+            if [ $i -gt 120 ]; then
+              echo "Broker failed to start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Examples
         env:
-          PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
-          PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
-        run: hatch run example --broker-url=${{ env.PACT_BROKER_URL }}
+          PACT_BROKER_USERNAME: ${{secrets.PACT_BROKER_USERNAME}}
+          PACT_BROKER_PASSWORD: ${{secrets.PACT_BROKER_PASSWORD}}
+        run: >
+          hatch run example --broker-url=http://pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3  # v5.3.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: examples
 
   format:
     name: Format
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install Python
         run: uv python install ${{ env.STABLE_PYTHON_VERSION }}
@@ -119,13 +240,19 @@ jobs:
 
   lint:
     name: Lint
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install Python
         run: uv python install ${{ env.STABLE_PYTHON_VERSION }}
@@ -133,18 +260,24 @@ jobs:
       - name: Install Hatch
         run: uv tool install hatch
 
-      - name: Lint
+      - name: Format
         run: hatch run lint
 
   typecheck:
     name: Typecheck
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install Python
         run: uv python install ${{ env.STABLE_PYTHON_VERSION }}
@@ -152,37 +285,46 @@ jobs:
       - name: Install Hatch
         run: uv tool install hatch
 
-      - name: Typecheck
+      - name: Format
         run: hatch run typecheck
 
   spelling:
     name: Spell check
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - name: Spell Check
-        uses: crate-ci/typos@v1.29.7
+      - name: Spell Check Repo   https://github.com/crate-ci/typos/commit/
+        uses: crate-ci/typos@51f257b946f503b768e522781f56e9b7b5570d48  # v1.29.7
 
   pre-commit:
     name: Pre-commit
+
     runs-on: ubuntu-latest
 
     env:
       PRE_COMMIT_HOME: ${{ github.workspace }}/.pre-commit
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Cache pre-commit
-        uses: actions/cache@v4
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57  # v4.2.0
         with:
-          path: ${{ env.PRE_COMMIT_HOME }}
+          path: |
+            ${{ env.PRE_COMMIT_HOME }}
           key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pre-commit-
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355  # v5.2.2
+        with:
+          enable-cache: true
+          cache-suffix: pre-commit
+          cache-dependency-glob: ''
 
       - name: Install pre-commit
         run: uv tool install pre-commit
