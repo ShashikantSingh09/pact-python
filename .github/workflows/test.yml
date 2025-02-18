@@ -18,7 +18,7 @@ env:
   PYTEST_ADDOPTS: --color=yes
   HATCH_VERBOSE: '1'
   FORCE_COLOR: '1'
-  PACT_BROKER_URL: 'http://PactSt-PactB-l4tJtGszY4Yg-1300157738.us-east-1.elb.amazonaws.com'
+  PACT_BROKER_URL: 'http://pactst-pactb-wdcofnxvx43h-456035495.us-east-1.elb.amazonaws.com'
   PACT_BROKER_USERNAME: ${{ secrets.PACT_BROKER_USERNAME }}
   PACT_BROKER_PASSWORD: ${{ secrets.PACT_BROKER_PASSWORD }}
 
